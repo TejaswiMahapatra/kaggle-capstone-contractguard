@@ -1,0 +1,76 @@
+# ContractGuard AI - Google Cloud Build Configuration
+# Deploys to Cloud Run
+
+steps:
+  # ==========================================================================
+  # Step 1: Build Docker Image
+  # ==========================================================================
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/contractguard-ai:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/contractguard-ai:latest'
+      - '-f'
+      - 'deploy/Dockerfile'
+      - '.'
+
+  # ==========================================================================
+  # Step 2: Push to Container Registry
+  # ==========================================================================
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/contractguard-ai:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/contractguard-ai:latest'
+
+  # ==========================================================================
+  # Step 3: Deploy to Cloud Run
+  # ==========================================================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'contractguard-ai'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/contractguard-ai:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '300s'
+      - '--set-env-vars'
+      - 'APP_ENV=production,DEBUG=false'
+      - '--set-secrets'
+      - 'GOOGLE_API_KEY=google-api-key:latest'
+
+# ==========================================================================
+# Substitutions
+# ==========================================================================
+substitutions:
+  _REGION: 'us-central1'
+
+# ==========================================================================
+# Options
+# ==========================================================================
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+# ==========================================================================
+# Images to store
+# ==========================================================================
+images:
+  - 'gcr.io/$PROJECT_ID/contractguard-ai:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/contractguard-ai:latest'

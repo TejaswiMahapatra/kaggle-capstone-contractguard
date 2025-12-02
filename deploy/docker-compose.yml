@@ -1,0 +1,177 @@
+# ContractGuard AI - Docker Compose for Local Development
+# Includes all required services
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # ContractGuard API
+  # ==========================================================================
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - WEAVIATE_URL=http://weaviate:8080
+      - REDIS_URL=redis://redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=contractguard
+      - APP_ENV=development
+      - DEBUG=true
+    depends_on:
+      weaviate:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../src:/app/src:ro  # Mount source for development
+      - memory_data:/app/data/memories
+    networks:
+      - contractguard
+
+  # ==========================================================================
+  # Weaviate Vector Database
+  # ==========================================================================
+  weaviate:
+    image: semitechnologies/weaviate:1.28.2
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - contractguard
+
+  # ==========================================================================
+  # Redis (Sessions & Caching)
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - contractguard
+
+  # ==========================================================================
+  # MinIO Object Storage
+  # ==========================================================================
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - contractguard
+
+  # ==========================================================================
+  # PostgreSQL (User Management & Metadata)
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: contractguard
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - contractguard
+
+  # ==========================================================================
+  # Redis Insight (Optional - Redis GUI)
+  # ==========================================================================
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+    networks:
+      - contractguard
+    profiles:
+      - tools
+
+  # ==========================================================================
+  # pgAdmin (Optional - PostgreSQL GUI)
+  # ==========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@contractguard.ai
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - postgres
+    networks:
+      - contractguard
+    profiles:
+      - tools
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  contractguard:
+    driver: bridge
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  weaviate_data:
+  redis_data:
+  minio_data:
+  postgres_data:
+  memory_data:
