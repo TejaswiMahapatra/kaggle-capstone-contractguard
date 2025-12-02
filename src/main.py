@@ -274,11 +274,20 @@ async def query_agent(request: QueryRequest):
             session_context = await session_manager.get_context_for_agent(session_id)
             prompt = request.question
 
+            # Add document context if a specific document is selected
+            if request.document_id:
+                prompt = f"""The user has selected a specific document with ID: {request.document_id}
+
+IMPORTANT: Focus your analysis on this document. Use the get_contract_context tool with this document_id to retrieve the document content, or use search_contracts with this document_id to find relevant sections.
+
+User question: {request.question}"""
+
             if session_context.get("conversation_history"):
-                prompt = f"""Previous conversation:
+                history_prefix = f"""Previous conversation:
 {session_context['conversation_history']}
 
-Current question: {request.question}"""
+"""
+                prompt = history_prefix + prompt
 
             result = await run_agent(runner, prompt)
             answer = str(result) if result else "I couldn't process your question."

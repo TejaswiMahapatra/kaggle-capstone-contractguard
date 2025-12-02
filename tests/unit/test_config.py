@@ -21,7 +21,7 @@ class TestSettings:
         assert settings.app_name == "ContractGuard AI"
         assert settings.app_env == "development"
         assert settings.api_port == 8000
-        assert settings.gemini_model == "gemini-2.0-flash-exp"
+        assert settings.gemini_model == "gemini-2.5-flash"
 
     def test_database_url_construction(self):
         """Test database URL is correctly constructed."""

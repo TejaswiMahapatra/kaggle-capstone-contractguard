@@ -6,7 +6,7 @@ Tests the FastAPI endpoints with mocked services.
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestHealthEndpoint:
@@ -41,11 +41,23 @@ class TestQueryEndpoint:
 
     def test_query_accepts_valid_request(self, test_client, test_query_request):
         """Test query endpoint accepts valid request."""
-        with patch("src.main.run_agent_query") as mock_query:
-            mock_query.return_value = {
-                "answer": "The termination conditions are...",
-                "sources": [],
-            }
+        # Create a mock SessionContext with proper attributes
+        mock_context = MagicMock()
+        mock_context.session_id = "test-session-123"
+        mock_context.user_id = None
+        mock_context.active_documents = []
+
+        mock_session_manager = AsyncMock()
+        mock_session_manager.create_session = AsyncMock(return_value=mock_context)
+        mock_session_manager.get_session = AsyncMock(return_value=mock_context)
+        mock_session_manager.add_message = AsyncMock()
+        mock_session_manager.get_context_for_agent = AsyncMock(return_value={})
+
+        with patch("src.main.get_session_manager", return_value=mock_session_manager), \
+             patch("src.main.create_orchestrator_agent"), \
+             patch("src.main.create_runner"), \
+             patch("src.main.run_agent", new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = "Test answer"
 
             response = test_client.post("/api/v1/query", json=test_query_request)
 
@@ -54,8 +66,23 @@ class TestQueryEndpoint:
 
     def test_query_with_session(self, test_client):
         """Test query with session context."""
-        with patch("src.main.run_agent_query") as mock_query:
-            mock_query.return_value = {"answer": "Test answer", "sources": []}
+        # Create a mock SessionContext with proper attributes
+        mock_context = MagicMock()
+        mock_context.session_id = "test-session-123"
+        mock_context.user_id = None
+        mock_context.active_documents = []
+
+        mock_session_manager = AsyncMock()
+        mock_session_manager.create_session = AsyncMock(return_value=mock_context)
+        mock_session_manager.get_session = AsyncMock(return_value=mock_context)
+        mock_session_manager.add_message = AsyncMock()
+        mock_session_manager.get_context_for_agent = AsyncMock(return_value={})
+
+        with patch("src.main.get_session_manager", return_value=mock_session_manager), \
+             patch("src.main.create_orchestrator_agent"), \
+             patch("src.main.create_runner"), \
+             patch("src.main.run_agent", new_callable=AsyncMock) as mock_run:
+            mock_run.return_value = "Test answer"
 
             response = test_client.post("/api/v1/query", json={
                 "question": "What is the contract term?",
@@ -113,8 +140,18 @@ class TestDocumentUploadEndpoint:
 class TestSessionEndpoint:
     """Tests for session management endpoint."""
 
-    def test_create_session(self, test_client, mock_session_manager):
+    def test_create_session(self, test_client):
         """Test session creation."""
+        # Create a mock SessionContext with proper attributes
+        mock_context = MagicMock()
+        mock_context.session_id = "test-session-123"
+        mock_context.user_id = "test-user-1"
+        mock_context.created_at = "2024-01-01T00:00:00Z"
+        mock_context.active_documents = []
+
+        mock_session_manager = AsyncMock()
+        mock_session_manager.create_session = AsyncMock(return_value=mock_context)
+
         with patch("src.main.get_session_manager", return_value=mock_session_manager):
             response = test_client.post("/api/v1/sessions", json={
                 "user_id": "test-user-1",

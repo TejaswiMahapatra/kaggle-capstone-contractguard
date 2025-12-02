@@ -15,14 +15,17 @@ class TestVectorService:
     @pytest.mark.asyncio
     async def test_health_check(self):
         """Test vector service health check."""
-        mock_client = MagicMock()
-        mock_client.is_ready.return_value = True
+        mock_weaviate_client = MagicMock()
+        mock_weaviate_client.is_ready.return_value = True
 
-        with patch("src.services.vector_service.weaviate.Client", return_value=mock_client):
+        with patch("src.services.vector_service.weaviate") as mock_weaviate:
+            mock_weaviate.connect_to_custom.return_value = mock_weaviate_client
+
             from src.services.vector_service import VectorService
 
             service = VectorService.__new__(VectorService)
-            service.client = mock_client
+            service._client = mock_weaviate_client
+            service.url = "http://localhost:8080"
 
             # Mock health check
             service.health_check = AsyncMock(return_value=True)
@@ -33,44 +36,66 @@ class TestVectorService:
     @pytest.mark.asyncio
     async def test_search_returns_results(self, sample_chunks):
         """Test vector search returns formatted results."""
-        mock_client = MagicMock()
+        mock_weaviate_client = MagicMock()
 
-        with patch("src.services.vector_service.weaviate.Client", return_value=mock_client):
-            from src.services.vector_service import VectorService
+        with patch("src.services.vector_service.weaviate") as mock_weaviate:
+            mock_weaviate.connect_to_custom.return_value = mock_weaviate_client
+
+            from src.services.vector_service import VectorService, SearchResult
 
             service = VectorService.__new__(VectorService)
-            service.client = mock_client
-            service.collection_name = "Contracts"
+            service._client = mock_weaviate_client
+            service.url = "http://localhost:8080"
 
-            # Mock search
+            # Mock search to return SearchResult objects
             service.search = AsyncMock(return_value=[
-                {"content": chunk["content"], "score": 0.9, "metadata": chunk["metadata"]}
-                for chunk in sample_chunks
+                SearchResult(
+                    id=f"id-{i}",
+                    text=chunk["content"],
+                    score=0.9,
+                    metadata=chunk["metadata"]
+                )
+                for i, chunk in enumerate(sample_chunks)
             ])
 
-            results = await service.search("test query", top_k=3)
+            results = await service.search(
+                collection_name="contracts",
+                query_vector=[0.1] * 384,
+                top_k=3,
+            )
 
             assert len(results) == len(sample_chunks)
-            assert all("content" in r for r in results)
+            assert all(hasattr(r, "text") for r in results)
 
     @pytest.mark.asyncio
-    async def test_store_chunks(self, sample_chunks):
-        """Test storing document chunks."""
-        mock_client = MagicMock()
+    async def test_insert_documents(self, sample_chunks):
+        """Test inserting document chunks."""
+        mock_weaviate_client = MagicMock()
 
-        with patch("src.services.vector_service.weaviate.Client", return_value=mock_client):
+        with patch("src.services.vector_service.weaviate") as mock_weaviate:
+            mock_weaviate.connect_to_custom.return_value = mock_weaviate_client
+
             from src.services.vector_service import VectorService
 
             service = VectorService.__new__(VectorService)
-            service.client = mock_client
-            service.collection_name = "Contracts"
+            service._client = mock_weaviate_client
+            service.url = "http://localhost:8080"
 
-            # Mock store
-            service.store_chunks = AsyncMock(return_value=True)
+            # Mock insert_documents
+            service.insert_documents = AsyncMock(return_value=["id-1", "id-2"])
 
-            result = await service.store_chunks(sample_chunks, document_id="doc-123")
+            texts = [chunk["content"] for chunk in sample_chunks]
+            vectors = [[0.1] * 384 for _ in sample_chunks]
+            metadata_list = [chunk["metadata"] for chunk in sample_chunks]
 
-            assert result is True
+            result = await service.insert_documents(
+                collection_name="contracts",
+                texts=texts,
+                vectors=vectors,
+                metadata_list=metadata_list,
+            )
+
+            assert len(result) == 2
 
 
 class TestStorageService:
@@ -79,15 +104,18 @@ class TestStorageService:
     @pytest.mark.asyncio
     async def test_health_check(self):
         """Test storage service health check."""
-        mock_client = MagicMock()
-        mock_client.bucket_exists.return_value = True
+        mock_minio_client = MagicMock()
+        mock_minio_client.list_buckets.return_value = []
 
-        with patch("src.services.storage_service.Minio", return_value=mock_client):
+        with patch("src.services.storage_service.Minio", return_value=mock_minio_client):
             from src.services.storage_service import StorageService
 
             service = StorageService.__new__(StorageService)
-            service.client = mock_client
-            service.bucket_name = "contracts"
+            service._client = mock_minio_client
+            service.endpoint = "localhost:9000"
+            service.access_key = "minioadmin"
+            service.secret_key = "minioadmin"
+            service.secure = False
 
             # Mock health check
             service.health_check = AsyncMock(return_value=True)
@@ -96,40 +124,56 @@ class TestStorageService:
             assert result is True
 
     @pytest.mark.asyncio
-    async def test_upload_file(self):
-        """Test file upload to storage."""
-        mock_client = MagicMock()
+    async def test_upload_document(self):
+        """Test document upload to storage."""
+        mock_minio_client = MagicMock()
+        mock_minio_client.bucket_exists.return_value = True
+        mock_minio_client.put_object.return_value = MagicMock(etag="abc123")
 
-        with patch("src.services.storage_service.Minio", return_value=mock_client):
-            from src.services.storage_service import StorageService
+        with patch("src.services.storage_service.Minio", return_value=mock_minio_client):
+            from src.services.storage_service import StorageService, StoredDocument
 
             service = StorageService.__new__(StorageService)
-            service.client = mock_client
-            service.bucket_name = "contracts"
+            service._client = mock_minio_client
+            service.endpoint = "localhost:9000"
+            service.access_key = "minioadmin"
+            service.secret_key = "minioadmin"
+            service.secure = False
 
-            # Mock upload
-            service.upload_file = AsyncMock(return_value="contracts/test-doc.pdf")
-
-            path = await service.upload_file(
-                file_content=b"PDF content",
-                filename="test-doc.pdf",
+            # Mock upload_document
+            service.upload_document = AsyncMock(return_value=StoredDocument(
+                object_name="doc-123.pdf",
+                bucket="contracts",
+                size=1024,
                 content_type="application/pdf",
+                etag="abc123",
+                metadata={"document_id": "doc-123", "original_filename": "test.pdf"},
+            ))
+
+            result = await service.upload_document(
+                file_data=b"PDF content",
+                filename="test.pdf",
+                document_id="doc-123",
             )
 
-            assert path == "contracts/test-doc.pdf"
+            assert result.object_name == "doc-123.pdf"
+            assert result.bucket == "contracts"
 
     @pytest.mark.asyncio
     async def test_ensure_bucket_creates_if_missing(self):
         """Test bucket creation when missing."""
-        mock_client = MagicMock()
-        mock_client.bucket_exists.return_value = False
+        mock_minio_client = MagicMock()
+        mock_minio_client.bucket_exists.return_value = False
 
-        with patch("src.services.storage_service.Minio", return_value=mock_client):
+        with patch("src.services.storage_service.Minio", return_value=mock_minio_client):
             from src.services.storage_service import StorageService
 
             service = StorageService.__new__(StorageService)
-            service.client = mock_client
-            service.bucket_name = "contracts"
+            service._client = mock_minio_client
+            service.endpoint = "localhost:9000"
+            service.access_key = "minioadmin"
+            service.secret_key = "minioadmin"
+            service.secure = False
 
             # Mock ensure_bucket
             service.ensure_bucket = AsyncMock(return_value=True)
@@ -140,121 +184,127 @@ class TestStorageService:
 
 
 class TestSessionService:
-    """Tests for SessionService."""
+    """Tests for SessionManager."""
 
     @pytest.mark.asyncio
     async def test_create_session(self):
         """Test session creation."""
         mock_redis = AsyncMock()
-        mock_redis.set.return_value = True
+        mock_redis.setex.return_value = True
+        mock_redis.expire.return_value = True
 
-        with patch("src.memory.session_service.redis.from_url", return_value=mock_redis):
-            from src.memory.session_service import SessionManager
+        from src.memory.session_service import SessionManager, SessionContext
 
-            manager = SessionManager.__new__(SessionManager)
-            manager.redis = mock_redis
-            manager.ttl = 86400
+        manager = SessionManager.__new__(SessionManager)
+        manager._redis = mock_redis
+        manager.session_ttl = 86400
+        manager.redis_url = "redis://localhost:6379"
 
-            # Mock create_session
-            session_id = str(uuid.uuid4())
-            manager.create_session = AsyncMock(return_value={
-                "session_id": session_id,
-                "user_id": "user-123",
-                "created_at": "2024-01-01T00:00:00Z",
-            })
+        # Mock create_session to return a SessionContext
+        session_id = str(uuid.uuid4())
+        manager.create_session = AsyncMock(return_value=SessionContext(
+            session_id=session_id,
+            user_id="user-123",
+            active_documents=[],
+        ))
 
-            session = await manager.create_session(user_id="user-123")
+        session = await manager.create_session(user_id="user-123")
 
-            assert "session_id" in session
-            assert session["user_id"] == "user-123"
+        assert session.session_id == session_id
+        assert session.user_id == "user-123"
 
     @pytest.mark.asyncio
     async def test_get_session(self):
         """Test session retrieval."""
         mock_redis = AsyncMock()
 
-        with patch("src.memory.session_service.redis.from_url", return_value=mock_redis):
-            from src.memory.session_service import SessionManager
+        from src.memory.session_service import SessionManager, SessionContext
 
-            manager = SessionManager.__new__(SessionManager)
-            manager.redis = mock_redis
+        manager = SessionManager.__new__(SessionManager)
+        manager._redis = mock_redis
+        manager.session_ttl = 86400
+        manager.redis_url = "redis://localhost:6379"
 
-            # Mock get_session
-            manager.get_session = AsyncMock(return_value={
-                "session_id": "session-123",
-                "user_id": "user-123",
-                "history": [{"role": "user", "content": "Hello"}],
-            })
+        # Mock get_session to return a SessionContext
+        manager.get_session = AsyncMock(return_value=SessionContext(
+            session_id="session-123",
+            user_id="user-123",
+            active_documents=[],
+        ))
 
-            session = await manager.get_session("session-123")
+        session = await manager.get_session("session-123")
 
-            assert session["session_id"] == "session-123"
+        assert session.session_id == "session-123"
 
     @pytest.mark.asyncio
-    async def test_add_to_history(self):
-        """Test adding to conversation history."""
+    async def test_add_message(self):
+        """Test adding message to conversation history."""
         mock_redis = AsyncMock()
+        mock_redis.exists.return_value = True
+        mock_redis.rpush.return_value = 1
+        mock_redis.expire.return_value = True
 
-        with patch("src.memory.session_service.redis.from_url", return_value=mock_redis):
-            from src.memory.session_service import SessionManager
+        from src.memory.session_service import SessionManager
 
-            manager = SessionManager.__new__(SessionManager)
-            manager.redis = mock_redis
+        manager = SessionManager.__new__(SessionManager)
+        manager._redis = mock_redis
+        manager.session_ttl = 86400
+        manager.redis_url = "redis://localhost:6379"
 
-            # Mock add_to_history
-            manager.add_to_history = AsyncMock(return_value=True)
+        # Mock add_message
+        manager.add_message = AsyncMock(return_value=True)
 
-            result = await manager.add_to_history(
-                session_id="session-123",
-                role="user",
-                content="What are the payment terms?",
-            )
+        result = await manager.add_message(
+            session_id="session-123",
+            role="user",
+            content="What are the payment terms?",
+        )
 
-            assert result is True
+        assert result is True
 
 
 class TestEmbeddingService:
     """Tests for EmbeddingService."""
 
     @pytest.mark.asyncio
-    async def test_embed_text(self):
-        """Test text embedding generation."""
-        mock_model = MagicMock()
-        mock_model.embed_content.return_value = MagicMock(
-            embedding=[0.1] * 768
-        )
-
-        with patch("src.services.embedding_service.genai") as mock_genai:
-            mock_genai.embed_content.return_value = {"embedding": [0.1] * 768}
-
-            from src.services.embedding_service import EmbeddingService
-
-            service = EmbeddingService.__new__(EmbeddingService)
-
-            # Mock embed
-            service.embed = AsyncMock(return_value=[0.1] * 768)
-
-            embedding = await service.embed("Test text for embedding")
-
-            assert len(embedding) == 768
-
-    @pytest.mark.asyncio
-    async def test_embed_batch(self):
-        """Test batch text embedding."""
+    async def test_embed_query(self):
+        """Test query embedding generation."""
         from src.services.embedding_service import EmbeddingService
 
         service = EmbeddingService.__new__(EmbeddingService)
 
-        # Mock embed_batch
+        # Mock provider
+        mock_provider = MagicMock()
+        mock_provider.embed_text = AsyncMock(return_value=[0.1] * 768)
+        mock_provider.get_dimension.return_value = 768
+        service.provider = mock_provider
+
+        embedding = await service.embed_query("Test text for embedding")
+
+        assert len(embedding) == 768
+        mock_provider.embed_text.assert_called_once_with("Test text for embedding")
+
+    @pytest.mark.asyncio
+    async def test_embed_documents(self):
+        """Test batch document embedding."""
+        from src.services.embedding_service import EmbeddingService
+
+        service = EmbeddingService.__new__(EmbeddingService)
+
+        # Mock provider
+        mock_provider = MagicMock()
         texts = ["Text 1", "Text 2", "Text 3"]
-        service.embed_batch = AsyncMock(return_value=[
+        mock_provider.embed_batch = AsyncMock(return_value=[
             [0.1] * 768 for _ in texts
         ])
+        mock_provider.get_dimension.return_value = 768
+        service.provider = mock_provider
 
-        embeddings = await service.embed_batch(texts)
+        embeddings = await service.embed_documents(texts)
 
         assert len(embeddings) == len(texts)
         assert all(len(e) == 768 for e in embeddings)
+        mock_provider.embed_batch.assert_called_once_with(texts)
 
 
 class TestLongRunningTaskManager:
@@ -263,20 +313,27 @@ class TestLongRunningTaskManager:
     @pytest.mark.asyncio
     async def test_create_task(self):
         """Test task creation."""
-        mock_redis = AsyncMock()
+        mock_pubsub = MagicMock()
+        mock_pubsub.publish = AsyncMock(return_value=1)
+        mock_cache = MagicMock()
+        mock_cache.set = AsyncMock(return_value=True)
 
-        with patch("src.core.long_running.get_redis_client", return_value=mock_redis):
-            from src.core.long_running import LongRunningTaskManager
+        with patch("src.core.long_running.get_redis_pubsub", return_value=mock_pubsub), \
+             patch("src.core.long_running.RedisCache", return_value=mock_cache):
+            from src.core.long_running import LongRunningTaskManager, LongRunningTask, TaskStatus
 
             manager = LongRunningTaskManager.__new__(LongRunningTaskManager)
-            manager.redis = mock_redis
             manager.tasks = {}
+            manager.pubsub = mock_pubsub
+            manager.cache = mock_cache
+            manager._executors = {}
+            manager._pause_events = {}
 
-            # Mock create_task
-            manager.create_task = AsyncMock(return_value=MagicMock(
+            # Mock create_task to return a LongRunningTask
+            manager.create_task = AsyncMock(return_value=LongRunningTask(
                 id="task-123",
                 name="analysis",
-                status="PENDING",
+                status=TaskStatus.PENDING,
             ))
 
             task = await manager.create_task(
@@ -285,27 +342,37 @@ class TestLongRunningTaskManager:
             )
 
             assert task.id == "task-123"
-            assert task.status == "PENDING"
+            assert task.status == TaskStatus.PENDING
 
     @pytest.mark.asyncio
     async def test_pause_resume_task(self):
         """Test task pause and resume."""
-        from src.core.long_running import LongRunningTaskManager
+        mock_pubsub = MagicMock()
+        mock_pubsub.publish = AsyncMock(return_value=1)
+        mock_cache = MagicMock()
 
-        manager = LongRunningTaskManager.__new__(LongRunningTaskManager)
-        manager.tasks = {}
+        with patch("src.core.long_running.get_redis_pubsub", return_value=mock_pubsub), \
+             patch("src.core.long_running.RedisCache", return_value=mock_cache):
+            from src.core.long_running import LongRunningTaskManager
 
-        # Mock pause
-        manager.pause_task = AsyncMock(return_value=True)
-        manager.resume_task = AsyncMock(return_value=True)
+            manager = LongRunningTaskManager.__new__(LongRunningTaskManager)
+            manager.tasks = {}
+            manager.pubsub = mock_pubsub
+            manager.cache = mock_cache
+            manager._executors = {}
+            manager._pause_events = {}
 
-        # Pause
-        paused = await manager.pause_task("task-123")
-        assert paused is True
+            # Mock pause and resume
+            manager.pause_task = AsyncMock(return_value=True)
+            manager.resume_task = AsyncMock(return_value=True)
 
-        # Resume
-        resumed = await manager.resume_task("task-123")
-        assert resumed is True
+            # Pause
+            paused = await manager.pause_task("task-123")
+            assert paused is True
+
+            # Resume
+            resumed = await manager.resume_task("task-123")
+            assert resumed is True
 
 
 class TestRedisClient:
@@ -315,14 +382,16 @@ class TestRedisClient:
     async def test_cache_set_get(self):
         """Test Redis cache set and get."""
         mock_redis = AsyncMock()
-        mock_redis.get.return_value = b'{"key": "value"}'
+        mock_redis.get.return_value = '{"key": "value"}'
         mock_redis.set.return_value = True
+        mock_redis.setex.return_value = True
 
-        with patch("src.core.redis_client.redis.from_url", return_value=mock_redis):
+        with patch("src.core.redis_client.get_redis", return_value=mock_redis):
             from src.core.redis_client import RedisCache
 
             cache = RedisCache.__new__(RedisCache)
             cache.redis = mock_redis
+            cache.prefix = "cache"
 
             # Mock set
             cache.set = AsyncMock(return_value=True)
@@ -335,11 +404,12 @@ class TestRedisClient:
             assert value == {"key": "value"}
 
     @pytest.mark.asyncio
-    async def test_pubsub_publish_subscribe(self):
-        """Test Redis pub/sub."""
+    async def test_pubsub_publish(self):
+        """Test Redis pub/sub publish."""
         mock_redis = AsyncMock()
+        mock_redis.publish.return_value = 1
 
-        with patch("src.core.redis_client.redis.from_url", return_value=mock_redis):
+        with patch("src.core.redis_client.get_redis", return_value=mock_redis):
             from src.core.redis_client import RedisPubSub
 
             pubsub = RedisPubSub.__new__(RedisPubSub)

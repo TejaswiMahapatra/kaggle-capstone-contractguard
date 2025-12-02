@@ -317,7 +317,7 @@ Our additions for enterprise persistence:
 
 ```python
 # Tools are automatically derived from function signature
-search_contracts = FunctionTool(func=_search_contracts_impl)
+search_contracts_tool = FunctionTool(func=search_contracts)
 ```
 
 Each tool:
@@ -325,6 +325,40 @@ Each tool:
 2. Executes business logic (embedding, search, analysis)
 3. Returns structured results
 4. Includes tracing via OpenTelemetry
+
+---
+
+## Database Architecture (Future-Ready)
+
+### Current MVP Data Flow
+
+```mermaid
+flowchart LR
+    PDF[PDF Upload] --> MINIO[(MinIO<br/>File Storage)]
+    PDF --> WEAVIATE[(Weaviate<br/>Embeddings + Metadata)]
+    QUERY[User Query] --> REDIS[(Redis<br/>Session State)]
+```
+
+### PostgreSQL Schema (Prepared for Future Features)
+
+The PostgreSQL database has tables defined but **not actively used** in the current MVP:
+
+| Table | Schema | Future Purpose |
+|-------|--------|----------------|
+| **users** | id, email, role, preferences | User authentication, RBAC |
+| **documents** | id, filename, status, user_id | Document ownership, audit trails |
+| **sessions** | id, user_id, session_data | Persistent conversation history |
+
+**Why tables exist but aren't used:**
+- **MVP Focus**: The current implementation prioritizes agent functionality over user management
+- **Future-Proofing**: Schema is ready for authentication, multi-tenancy, and audit logging
+- **Separation of Concerns**: Weaviate handles vectors, MinIO handles files, Redis handles sessions
+
+**Current data storage:**
+- **PDFs** → MinIO (S3-compatible object storage)
+- **Embeddings + Metadata** → Weaviate (vector database)
+- **Sessions** → Redis (fast key-value store with TTL)
+- **PostgreSQL** → Schema defined, ready for user features
 
 ---
 

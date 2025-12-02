@@ -27,6 +27,10 @@ services:
       - POSTGRES_DB=contractguard
       - APP_ENV=development
       - DEBUG=true
+      # OpenTelemetry Configuration
+      - ENABLE_TRACING=true
+      - OTEL_SERVICE_NAME=contractguard-ai
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     depends_on:
       weaviate:
         condition: service_healthy
@@ -35,6 +39,8 @@ services:
       minio:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     volumes:
       - ../src:/app/src:ro  # Mount source for development
@@ -60,10 +66,11 @@ services:
     volumes:
       - weaviate_data:/var/lib/weaviate
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - contractguard
 
@@ -122,6 +129,28 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - contractguard
+
+  # ==========================================================================
+  # Jaeger (Distributed Tracing)
+  # ==========================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+      - "14268:14268"  # Jaeger thrift HTTP
+      - "6831:6831/udp"  # Jaeger thrift compact (UDP)
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+      LOG_LEVEL: debug
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:14269/"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -44,8 +44,8 @@ def setup_tracing() -> None:
     # Create and configure TracerProvider
     provider = TracerProvider(resource=resource)
 
-    if settings.is_production:
-        # Production: Use OTLP exporter
+    # Use OTLP exporter if endpoint is configured, otherwise console
+    if settings.otel_exporter_otlp_endpoint:
         try:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 
@@ -57,7 +57,7 @@ def setup_tracing() -> None:
             # Fall back to console if OTLP not available
             provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     else:
-        # Development: Console output
+        # No endpoint configured: Console output
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
 
     # Set global tracer provider

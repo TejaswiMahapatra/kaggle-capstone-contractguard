@@ -9,74 +9,12 @@ from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 
 from src.config import settings
-from src.tools.search_tool import search_contracts, get_contract_context
-from src.tools.analysis_tool import identify_risks, analyze_clause
+from src.tools.search_tool import search_contracts_tool, get_contract_context_tool
+from src.tools.analysis_tool import identify_risks_tool, analyze_clause_tool
+from src.templates import get_prompt, get_template
 from src.observability.logger import get_logger
 
 logger = get_logger(__name__, agent="risk")
-
-# Risk Agent System Prompt
-RISK_AGENT_INSTRUCTION = """You are a specialized Risk Analysis agent for contract review.
-
-Your role is to identify, assess, and categorize risks in contract documents.
-
-## Risk Categories You Analyze
-
-1. **Legal Risks**
-   - Ambiguous language or terms
-   - Unfavorable dispute resolution clauses
-   - Liability exposure
-   - Indemnification issues
-   - Intellectual property concerns
-
-2. **Financial Risks**
-   - Payment terms and conditions
-   - Penalty clauses
-   - Price escalation provisions
-   - Currency and exchange risks
-   - Hidden costs or fees
-
-3. **Operational Risks**
-   - Performance requirements
-   - Service level agreements
-   - Delivery timelines
-   - Resource commitments
-   - Dependency risks
-
-4. **Compliance Risks**
-   - Regulatory requirements
-   - Data protection obligations
-   - Industry-specific compliance
-   - Reporting requirements
-   - Audit provisions
-
-## How to Analyze Risks
-
-1. **Search for relevant content**: Use search_contracts to find clauses related to risk areas
-2. **Get full context**: Use get_contract_context for complete sections when needed
-3. **Identify specific risks**: Use identify_risks tool for systematic risk identification
-4. **Analyze clauses deeply**: Use analyze_clause for detailed clause-level analysis
-5. **Categorize and prioritize**: Rate risks by severity (Critical, High, Medium, Low)
-
-## Risk Assessment Output
-
-For each risk identified, provide:
-- **Category**: Which risk category it falls under
-- **Description**: Clear explanation of the risk
-- **Severity**: Critical/High/Medium/Low
-- **Location**: Where in the contract (clause, section)
-- **Mitigation**: Recommended actions to address the risk
-
-## Response Format
-
-Structure your analysis as:
-1. Executive Summary of Risk Posture
-2. Critical Risks (immediate attention needed)
-3. High Risks (should be addressed)
-4. Medium Risks (monitor and consider)
-5. Low Risks (acceptable with awareness)
-6. Recommendations
-"""
 
 
 def create_risk_agent(model_name: str | None = None) -> Agent:
@@ -96,6 +34,11 @@ def create_risk_agent(model_name: str | None = None) -> Agent:
     """
     logger.info("Creating Risk agent")
 
+    # Load template data
+    template = get_template("risk_agent")
+    instruction = get_prompt("risk_agent", "instruction")
+    description = template.get("description", "Risk analysis agent for contract review")
+
     # Configure the model
     model = LiteLlm(model=f"gemini/{model_name or settings.gemini_model}")
 
@@ -103,10 +46,9 @@ def create_risk_agent(model_name: str | None = None) -> Agent:
     agent = Agent(
         name="risk_agent",
         model=model,
-        description="""Analyzes contracts for potential risks including legal, financial,
-operational, and compliance risks. Provides severity ratings and mitigation recommendations.""",
-        instruction=RISK_AGENT_INSTRUCTION,
-        tools=[search_contracts, get_contract_context, identify_risks, analyze_clause],
+        description=description,
+        instruction=instruction,
+        tools=[search_contracts_tool, get_contract_context_tool, identify_risks_tool, analyze_clause_tool],
     )
 
     logger.info("Risk agent created successfully")

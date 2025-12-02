@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ContractGuard AI - Contract Intelligence Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        turquoise: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
@@ -26,9 +48,9 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen" x-data="contractGuard()">
+<body class="bg-turquoise-50 min-h-screen" x-data="contractGuard()">
     <!-- Header -->
-    <header class="bg-indigo-600 text-white shadow-lg">
+    <header class="bg-gradient-to-r from-turquoise-600 to-turquoise-500 text-white shadow-lg">
         <div class="container mx-auto px-4 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
@@ -37,7 +59,7 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm" x-text="sessionId ? 'Session: ' + sessionId.slice(0, 8) + '...' : 'No Session'"></span>
-                    <button @click="createSession()" class="bg-indigo-500 hover:bg-indigo-400 px-3 py-1 rounded text-sm">
+                    <button @click="createSession()" class="bg-turquoise-700 hover:bg-turquoise-800 px-3 py-1 rounded text-sm">
                         New Session
                     </button>
                 </div>
@@ -52,15 +74,15 @@
                 <!-- Upload Section -->
                 <div class="bg-white rounded-lg shadow p-4 mb-4">
                     <h2 class="font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-upload mr-2 text-indigo-600"></i>
+                        <i class="fas fa-upload mr-2 text-turquoise-600"></i>
                         Upload Contract
                     </h2>
                     <form @submit.prevent="uploadDocument()">
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors"
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-turquoise-400 transition-colors"
                              @dragover.prevent="dragover = true"
                              @dragleave.prevent="dragover = false"
                              @drop.prevent="handleDrop($event)"
-                             :class="{ 'border-indigo-400 bg-indigo-50': dragover }">
+                             :class="{ 'border-turquoise-400 bg-turquoise-50': dragover }">
                             <input type="file" id="fileInput" class="hidden" accept=".pdf,.md,.txt" @change="handleFileSelect($event)">
                             <label for="fileInput" class="cursor-pointer">
                                 <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
@@ -69,7 +91,7 @@
                             </label>
                         </div>
                         <button type="submit"
-                                class="w-full mt-3 bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+                                class="w-full mt-3 bg-turquoise-500 text-white py-2 rounded hover:bg-turquoise-600 disabled:opacity-50"
                                 :disabled="!selectedFile || uploading">
                             <span x-show="!uploading">Upload</span>
                             <span x-show="uploading"><i class="fas fa-spinner fa-spin"></i> Uploading...</span>
@@ -80,14 +102,14 @@
                 <!-- Documents List -->
                 <div class="bg-white rounded-lg shadow p-4">
                     <h2 class="font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-folder-open mr-2 text-indigo-600"></i>
+                        <i class="fas fa-folder-open mr-2 text-turquoise-600"></i>
                         Documents
                     </h2>
                     <div class="space-y-2 max-h-64 overflow-y-auto">
                         <template x-for="doc in documents" :key="doc.id">
                             <div class="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer"
                                  @click="selectDocument(doc)"
-                                 :class="selectedDocId === doc.id ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''">
+                                 :class="selectedDocId === doc.id ? 'ring-2 ring-turquoise-500 bg-turquoise-50' : ''">
                                 <div class="flex items-center space-x-2 flex-1 min-w-0">
                                     <i class="fas fa-file-pdf text-red-500 flex-shrink-0"></i>
                                     <span class="text-sm truncate" x-text="doc.filename" :title="doc.filename"></span>
@@ -111,22 +133,22 @@
                     </h2>
                     <div class="space-y-2">
                         <button @click="askQuestion('What are the key risks in this contract?')"
-                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-indigo-50 hover:text-indigo-700">
+                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-turquoise-50 hover:text-turquoise-700">
                             <i class="fas fa-exclamation-triangle mr-2 text-yellow-500"></i>
                             Analyze Risks
                         </button>
                         <button @click="askQuestion('Generate an executive summary of this contract')"
-                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-indigo-50 hover:text-indigo-700">
-                            <i class="fas fa-file-alt mr-2 text-blue-500"></i>
+                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-turquoise-50 hover:text-turquoise-700">
+                            <i class="fas fa-file-alt mr-2 text-turquoise-500"></i>
                             Executive Summary
                         </button>
                         <button @click="askQuestion('What are the termination conditions?')"
-                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-indigo-50 hover:text-indigo-700">
+                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-turquoise-50 hover:text-turquoise-700">
                             <i class="fas fa-door-open mr-2 text-red-500"></i>
                             Termination Terms
                         </button>
                         <button @click="askQuestion('List all obligations for each party')"
-                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-indigo-50 hover:text-indigo-700">
+                                class="w-full text-left text-sm p-2 bg-gray-50 rounded hover:bg-turquoise-50 hover:text-turquoise-700">
                             <i class="fas fa-tasks mr-2 text-green-500"></i>
                             List Obligations
                         </button>
@@ -140,12 +162,12 @@
                     <!-- Chat Header -->
                     <div class="border-b p-4 flex items-center justify-between">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-robot text-indigo-600"></i>
+                            <div class="w-10 h-10 bg-turquoise-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-robot text-turquoise-600"></i>
                             </div>
                             <div>
                                 <h2 class="font-semibold text-gray-800">ContractGuard Assistant</h2>
-                                <p class="text-xs text-gray-500">Powered by Gemini 2.0 & Google ADK</p>
+                                <p class="text-xs text-gray-500">Powered by Gemini 2.5 Flash & Google ADK</p>
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
@@ -160,7 +182,7 @@
                     <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chatMessages">
                         <template x-for="(msg, index) in messages" :key="index">
                             <div class="chat-message" :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                                <div :class="msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800'"
+                                <div :class="msg.role === 'user' ? 'bg-turquoise-600 text-white' : 'bg-gray-100 text-gray-800'"
                                      class="max-w-3xl rounded-lg p-4 shadow-sm">
                                     <div class="flex items-start space-x-2">
                                         <i :class="msg.role === 'user' ? 'fas fa-user' : 'fas fa-robot'"
@@ -200,10 +222,10 @@
                             <input type="text"
                                    x-model="userInput"
                                    placeholder="Ask about your contracts..."
-                                   class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                   class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-turquoise-500"
                                    :disabled="isTyping">
                             <button type="submit"
-                                    class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                                    class="bg-turquoise-500 text-white px-6 py-2 rounded-lg hover:bg-turquoise-600 disabled:opacity-50"
                                     :disabled="!userInput.trim() || isTyping">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
@@ -233,10 +255,10 @@
         <div class="container mx-auto flex justify-between items-center">
             <span>ContractGuard AI v1.0 | Kaggle Agents Intensive Capstone</span>
             <div class="flex items-center space-x-4">
-                <a href="/docs" target="_blank" class="hover:text-indigo-400">
+                <a href="/docs" target="_blank" class="hover:text-turquoise-400">
                     <i class="fas fa-book mr-1"></i> API Docs
                 </a>
-                <a href="/health" target="_blank" class="hover:text-indigo-400">
+                <a href="/health" target="_blank" class="hover:text-turquoise-400">
                     <i class="fas fa-heartbeat mr-1"></i> Health
                 </a>
             </div>
@@ -300,14 +322,14 @@
                 addWelcomeMessage() {
                     this.messages.push({
                         role: 'assistant',
-                        content: `👋 Welcome to **ContractGuard AI**!
+                        content: `Welcome to **ContractGuard AI**!
 
 I'm your intelligent contract analysis assistant. I can help you:
 
-- 🔍 **Search** for specific clauses and terms
-- ⚠️ **Identify risks** in your contracts
-- 📊 **Compare** multiple contracts
-- 📝 **Generate reports** and summaries
+- **Search** for specific clauses and terms
+- **Identify risks** in your contracts
+- **Compare** multiple contracts
+- **Generate reports** and summaries
 
 **Get started by uploading a contract** on the left, then ask me anything about it!
 
@@ -366,20 +388,20 @@ Try asking: "What are the termination conditions?" or "Analyze the risks in this
                             const data = await res.json();
                             this.messages.push({
                                 role: 'assistant',
-                                content: `✅ Document **${this.selectedFile.name}** uploaded successfully!\n\nDocument ID: \`${data.document_id}\`\nChunks created: ${data.chunks || 'Processing...'}\n\nYou can now ask questions about this document.`
+                                content: `Document **${this.selectedFile.name}** uploaded successfully.\n\nDocument ID: \`${data.document_id}\`\nChunks created: ${data.chunks || 'Processing...'}\n\nYou can now ask questions about this document.`
                             });
                             await this.loadDocuments();
                         } else {
                             const error = await res.json();
                             this.messages.push({
                                 role: 'assistant',
-                                content: `❌ Failed to upload document: ${error.detail || 'Unknown error'}`
+                                content: `Failed to upload document: ${error.detail || 'Unknown error'}`
                             });
                         }
                     } catch (e) {
                         this.messages.push({
                             role: 'assistant',
-                            content: `❌ Upload error: ${e.message}`
+                            content: `Upload error: ${e.message}`
                         });
                     } finally {
                         this.uploading = false;
@@ -394,7 +416,7 @@ Try asking: "What are the termination conditions?" or "Analyze the risks in this
                     const sizeKB = doc.size ? Math.round(doc.size / 1024) : 'N/A';
                     this.messages.push({
                         role: 'assistant',
-                        content: `📄 Selected document: **${doc.filename}**\n\nDocument ID: \`${doc.id}\`\nStatus: ${doc.status}\nSize: ${sizeKB} KB\n\nYou can now ask questions about this document. Try:\n- "What are the key risks?"\n- "Summarize the main obligations"\n- "What is the termination clause?"`
+                        content: `Selected document: **${doc.filename}**\n\nDocument ID: \`${doc.id}\`\nStatus: ${doc.status}\nSize: ${sizeKB} KB\n\nYou can now ask questions about this document. Try:\n- "What are the key risks?"\n- "Summarize the main obligations"\n- "What is the termination clause?"`
                     });
                     this.scrollToBottom();
                 },
@@ -417,13 +439,19 @@ Try asking: "What are the termination conditions?" or "Analyze the risks in this
                     this.scrollToBottom();
 
                     try {
+                        const requestBody = {
+                            question: question,
+                            session_id: this.sessionId
+                        };
+                        // Include document_id if a document is selected
+                        if (this.selectedDocId) {
+                            requestBody.document_id = this.selectedDocId;
+                        }
+
                         const res = await fetch(`${API_BASE}/api/v1/query`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                question: question,
-                                session_id: this.sessionId
-                            })
+                            body: JSON.stringify(requestBody)
                         });
 
                         if (res.ok) {
@@ -437,13 +465,13 @@ Try asking: "What are the termination conditions?" or "Analyze the risks in this
                             const error = await res.json();
                             this.messages.push({
                                 role: 'assistant',
-                                content: `❌ Error: ${error.detail || 'Failed to get response'}`
+                                content: `Error: ${error.detail || 'Failed to get response'}`
                             });
                         }
                     } catch (e) {
                         this.messages.push({
                             role: 'assistant',
-                            content: `❌ Connection error: ${e.message}. Please check if the server is running.`
+                            content: `Connection error: ${e.message}. Please check if the server is running.`
                         });
                     } finally {
                         this.isTyping = false;

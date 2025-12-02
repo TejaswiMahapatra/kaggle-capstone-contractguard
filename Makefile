@@ -1,7 +1,7 @@
 # ContractGuard AI - Makefile
 # Common commands for development and deployment
 
-.PHONY: help install dev run test lint format docker-build docker-up docker-down clean
+.PHONY: help install dev run test lint format docker-build docker-up docker-down clean telemetry-up telemetry-ui telemetry-down
 
 # Default target
 help:
@@ -35,6 +35,10 @@ help:
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make deploy        - Deploy to Cloud Run"
+	@echo ""
+	@echo "Telemetry:"
+	@echo "  make telemetry-up  - Start Jaeger for distributed tracing"
+	@echo "  make telemetry-ui  - Open Jaeger UI in browser"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean         - Clean up generated files"
@@ -174,6 +178,29 @@ health:
 	@echo ""
 	@curl -s http://localhost:8080/v1/.well-known/ready && echo "Weaviate: OK" || echo "Weaviate: NOT READY"
 	@docker compose -f deploy/docker-compose.yml exec -T redis redis-cli ping > /dev/null 2>&1 && echo "Redis: OK" || echo "Redis: NOT READY"
+
+# =============================================================================
+# Telemetry
+# =============================================================================
+
+telemetry-up:
+	docker-compose -f deploy/docker-compose.yml up -d jaeger
+	@echo ""
+	@echo "Jaeger tracing started:"
+	@echo "  - Jaeger UI:     http://localhost:16686"
+	@echo "  - OTLP gRPC:     localhost:4317"
+	@echo "  - OTLP HTTP:     localhost:4318"
+	@echo ""
+	@echo "To enable tracing in the app, set:"
+	@echo "  export ENABLE_TRACING=true"
+	@echo "  export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317"
+
+telemetry-ui:
+	@echo "Opening Jaeger UI..."
+	@open http://localhost:16686 2>/dev/null || xdg-open http://localhost:16686 2>/dev/null || echo "Open http://localhost:16686 in your browser"
+
+telemetry-down:
+	docker-compose -f deploy/docker-compose.yml stop jaeger
 
 # =============================================================================
 # Sample Data

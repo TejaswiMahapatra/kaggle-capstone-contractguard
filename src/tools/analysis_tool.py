@@ -17,7 +17,7 @@ from src.observability.tracer import trace_operation
 logger = get_logger(__name__, tool="analysis")
 
 
-async def _analyze_clause_impl(
+async def analyze_clause(
     clause_text: str,
     analysis_type: str = "general",
     context: str | None = None,
@@ -100,7 +100,7 @@ Provide a structured analysis:"""
             }
 
 
-async def _identify_risks_impl(
+async def identify_risks(
     contract_text: str,
     risk_categories: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -159,7 +159,7 @@ Format your response as a structured list of risks:"""
             }
 
 
-async def _extract_obligations_impl(
+async def extract_obligations(
     contract_text: str,
     party_name: str | None = None,
 ) -> dict[str, Any]:
@@ -218,6 +218,6 @@ Provide a structured list of obligations:"""
 
 
 # Create ADK FunctionTools - FunctionTool derives name from function name
-analyze_clause = FunctionTool(func=_analyze_clause_impl)
-identify_risks = FunctionTool(func=_identify_risks_impl)
-extract_obligations = FunctionTool(func=_extract_obligations_impl)
+analyze_clause_tool = FunctionTool(func=analyze_clause)
+identify_risks_tool = FunctionTool(func=identify_risks)
+extract_obligations_tool = FunctionTool(func=extract_obligations)

@@ -15,7 +15,7 @@ from src.observability.tracer import trace_operation
 logger = get_logger(__name__, tool="search")
 
 
-async def _search_contracts_impl(
+async def search_contracts(
     query: str,
     collection_name: str = "contracts",
     top_k: int = 5,
@@ -110,7 +110,7 @@ async def _search_contracts_impl(
             }
 
 
-async def _get_contract_context_impl(
+async def get_contract_context(
     document_id: str,
     collection_name: str = "contracts",
 ) -> dict[str, Any]:
@@ -192,7 +192,7 @@ async def _get_contract_context_impl(
             }
 
 
-async def _list_documents_impl(
+async def list_documents(
     collection_name: str = "contracts",
 ) -> dict[str, Any]:
     """
@@ -235,6 +235,6 @@ async def _list_documents_impl(
 
 
 # Create ADK FunctionTools - FunctionTool derives name from function name
-search_contracts = FunctionTool(func=_search_contracts_impl)
-get_contract_context = FunctionTool(func=_get_contract_context_impl)
-list_documents = FunctionTool(func=_list_documents_impl)
+search_contracts_tool = FunctionTool(func=search_contracts)
+get_contract_context_tool = FunctionTool(func=get_contract_context)
+list_documents_tool = FunctionTool(func=list_documents)

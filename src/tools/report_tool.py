@@ -17,7 +17,7 @@ from src.observability.tracer import trace_operation
 logger = get_logger(__name__, tool="report")
 
 
-async def _generate_summary_impl(
+async def generate_summary(
     contract_text: str,
     summary_type: str = "executive",
     max_length: int = 500,
@@ -111,7 +111,7 @@ Generate the summary:"""
             }
 
 
-async def _generate_risk_report_impl(
+async def generate_risk_report(
     risks: str,
     contract_summary: str | None = None,
 ) -> dict[str, Any]:
@@ -185,7 +185,7 @@ Generate the report:"""
             }
 
 
-async def _generate_comparison_report_impl(
+async def generate_comparison_report(
     contract_a_text: str,
     contract_b_text: str,
     contract_a_name: str = "Contract A",
@@ -290,6 +290,6 @@ Generate the report:"""
 
 
 # Create ADK FunctionTools - FunctionTool derives name from function name
-generate_summary = FunctionTool(func=_generate_summary_impl)
-generate_risk_report = FunctionTool(func=_generate_risk_report_impl)
-generate_comparison_report = FunctionTool(func=_generate_comparison_report_impl)
+generate_summary_tool = FunctionTool(func=generate_summary)
+generate_risk_report_tool = FunctionTool(func=generate_risk_report)
+generate_comparison_report_tool = FunctionTool(func=generate_comparison_report)

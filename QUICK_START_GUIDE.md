@@ -326,7 +326,7 @@ block-beta
     block:LEFT:1
         columns 1
         HEADER1["UPLOAD CONTRACT"]
-        UPLOAD["Drop PDF here\nor click"]
+        UPLOAD["Drop PDF here<br>or click"]
         HEADER2["DOCUMENTS"]
         DOC1["sample_nda.pdf"]
         DOC2["contract2.pdf"]
@@ -341,7 +341,7 @@ block-beta
         HEADER4["CHAT INTERFACE"]
         MSG1["Bot: Welcome to ContractGuard AI!"]
         MSG2["You: What is the liability cap?"]
-        MSG3["Bot: Based on Section 6.2,\nthe liability cap is $500,000..."]
+        MSG3["Bot: Based on Section 6.2,<br>the liability cap is $500,000..."]
         INPUT["Ask about your contracts..."]
         SUGGEST["Confidentiality? | Liability? | Parties?"]
     end

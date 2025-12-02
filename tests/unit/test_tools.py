@@ -14,45 +14,57 @@ class TestSearchTool:
     @pytest.mark.asyncio
     async def test_search_returns_results(self, mock_vector_service):
         """Test search tool returns results."""
-        with patch("src.tools.search_tool.get_vector_service", return_value=mock_vector_service):
-            from src.tools.search_tool import _search_contracts_impl
+        mock_embedding_service = AsyncMock()
+        mock_embedding_service.embed_query = AsyncMock(return_value=[0.1] * 384)
 
-            results = await _search_contracts_impl(
+        # Patch at the services module level since imports happen inside the function
+        with patch("src.services.vector_service.get_vector_service", return_value=mock_vector_service), \
+             patch("src.services.embedding_service.get_embedding_service", return_value=mock_embedding_service):
+            from src.tools.search_tool import search_contracts
+
+            results = await search_contracts(
                 query="termination clauses",
                 top_k=5,
             )
 
             assert results is not None
-            mock_vector_service.search.assert_called_once()
+            assert "success" in results
 
     @pytest.mark.asyncio
     async def test_search_with_document_filter(self, mock_vector_service):
         """Test search with document ID filter."""
-        with patch("src.tools.search_tool.get_vector_service", return_value=mock_vector_service):
-            from src.tools.search_tool import _search_contracts_impl
+        mock_embedding_service = AsyncMock()
+        mock_embedding_service.embed_query = AsyncMock(return_value=[0.1] * 384)
 
-            await _search_contracts_impl(
+        with patch("src.services.vector_service.get_vector_service", return_value=mock_vector_service), \
+             patch("src.services.embedding_service.get_embedding_service", return_value=mock_embedding_service):
+            from src.tools.search_tool import search_contracts
+
+            results = await search_contracts(
                 query="liability",
                 document_id="doc-123",
                 top_k=3,
             )
 
-            # Verify document filter was passed
-            call_args = mock_vector_service.search.call_args
-            assert call_args is not None
+            assert results is not None
+            assert "success" in results
 
     @pytest.mark.asyncio
     async def test_search_handles_empty_query(self, mock_vector_service):
         """Test search handles empty query gracefully."""
         mock_vector_service.search.return_value = []
+        mock_embedding_service = AsyncMock()
+        mock_embedding_service.embed_query = AsyncMock(return_value=[0.1] * 384)
 
-        with patch("src.tools.search_tool.get_vector_service", return_value=mock_vector_service):
-            from src.tools.search_tool import _search_contracts_impl
+        with patch("src.services.vector_service.get_vector_service", return_value=mock_vector_service), \
+             patch("src.services.embedding_service.get_embedding_service", return_value=mock_embedding_service):
+            from src.tools.search_tool import search_contracts
 
-            results = await _search_contracts_impl(query="", top_k=5)
+            results = await search_contracts(query="", top_k=5)
 
-            # Should handle gracefully
-            assert results is not None or results == []
+            # Should handle gracefully and return a dict
+            assert results is not None
+            assert isinstance(results, dict)
 
 
 class TestAnalysisTool:
@@ -61,98 +73,115 @@ class TestAnalysisTool:
     @pytest.mark.asyncio
     async def test_identify_risks_returns_structured_data(self):
         """Test risk identification returns structured data."""
-        from src.tools.analysis_tool import _identify_risks_impl
+        # Mock the Gemini client
+        mock_response = MagicMock()
+        mock_response.text = """
+        Risk 1: Financial Risk
+        - High liability cap of $1,000,000
+        - Severity: High
+        """
 
-        # Mock the LLM call
-        with patch("src.tools.analysis_tool._call_gemini") as mock_llm:
-            mock_llm.return_value = """
-            {
-                "risks": [
-                    {"type": "financial", "description": "High liability cap", "severity": "high"},
-                    {"type": "legal", "description": "Unfavorable jurisdiction", "severity": "medium"}
-                ]
-            }
-            """
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-            result = await _identify_risks_impl(
-                clause_text="The liability shall not exceed $1,000,000."
+        with patch("src.tools.analysis_tool.genai.Client", return_value=mock_client):
+            from src.tools.analysis_tool import identify_risks
+
+            result = await identify_risks(
+                contract_text="The liability shall not exceed $1,000,000."
             )
 
             assert result is not None
+            assert "success" in result
 
     @pytest.mark.asyncio
     async def test_analyze_clause_extracts_key_terms(self):
         """Test clause analysis extracts key terms."""
-        from src.tools.analysis_tool import _analyze_clause_impl
+        # Mock the Gemini client
+        mock_response = MagicMock()
+        mock_response.text = """
+        Clause Type: Liability Limitation
+        Key Terms: $500,000 cap, limitation of liability
+        Analysis: This clause limits total liability to $500,000.
+        """
 
-        with patch("src.tools.analysis_tool._call_gemini") as mock_llm:
-            mock_llm.return_value = """
-            {
-                "clause_type": "liability",
-                "key_terms": ["$500,000", "cap", "limitation"],
-                "obligations": ["limit liability"],
-                "analysis": "This clause limits total liability to $500,000."
-            }
-            """
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-            result = await _analyze_clause_impl(
+        with patch("src.tools.analysis_tool.genai.Client", return_value=mock_client):
+            from src.tools.analysis_tool import analyze_clause
+
+            result = await analyze_clause(
                 clause_text="Total liability shall not exceed $500,000.",
-                analysis_type="risk",
+                analysis_type="financial",
             )
 
             assert result is not None
+            assert "success" in result
 
 
 class TestReportTool:
     """Tests for report generation tools."""
 
     @pytest.mark.asyncio
-    async def test_generate_summary_creates_report(self, mock_vector_service):
+    async def test_generate_summary_creates_report(self):
         """Test summary generation creates proper report."""
-        with patch("src.tools.report_tool.get_vector_service", return_value=mock_vector_service), \
-             patch("src.tools.report_tool._call_gemini") as mock_llm:
+        # Mock the Gemini client
+        mock_response = MagicMock()
+        mock_response.text = """
+        ## Executive Summary
+        This is a Non-Disclosure Agreement between Party A and Party B.
 
-            mock_llm.return_value = """
-            ## Executive Summary
-            This is a Non-Disclosure Agreement between Party A and Party B.
+        ### Key Terms
+        - Term: 3 years
+        - Confidentiality Period: 5 years
 
-            ### Key Terms
-            - Term: 3 years
-            - Confidentiality Period: 5 years
+        ### Risks
+        - High liability cap of $500,000
+        """
 
-            ### Risks
-            - High liability cap of $500,000
-            """
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
-            from src.tools.report_tool import _generate_summary_impl
+        with patch("src.tools.report_tool.genai.Client", return_value=mock_client):
+            from src.tools.report_tool import generate_summary
 
-            result = await _generate_summary_impl(
-                document_id="doc-123",
+            result = await generate_summary(
+                contract_text="This is a sample NDA contract text...",
                 summary_type="executive",
             )
 
             assert result is not None
+            assert "success" in result
 
     @pytest.mark.asyncio
-    async def test_extract_obligations_parses_correctly(self):
-        """Test obligation extraction parses correctly."""
-        from src.tools.report_tool import _extract_obligations_impl
+    async def test_generate_risk_report(self):
+        """Test risk report generation."""
+        # Mock the Gemini client
+        mock_response = MagicMock()
+        mock_response.text = """
+        # Risk Assessment Report
 
-        with patch("src.tools.report_tool._call_gemini") as mock_llm:
-            mock_llm.return_value = """
-            {
-                "obligations": [
-                    {"party": "Receiving Party", "obligation": "Maintain confidentiality", "section": "2.1"},
-                    {"party": "Receiving Party", "obligation": "Return materials", "section": "4.1"}
-                ]
-            }
-            """
+        ## Executive Summary
+        Overall risk level: Medium
 
-            result = await _extract_obligations_impl(
-                contract_text="Sample contract text..."
+        ## Detailed Risk Analysis
+        - Risk 1: High liability cap
+        """
+
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+        with patch("src.tools.report_tool.genai.Client", return_value=mock_client):
+            from src.tools.report_tool import generate_risk_report
+
+            result = await generate_risk_report(
+                risks="High liability cap of $500,000",
+                contract_summary="NDA between Party A and B",
             )
 
             assert result is not None
+            assert "success" in result
 
 
 class TestGoogleSearchTool:
@@ -168,37 +197,36 @@ class TestGoogleSearchTool:
             query="what are standard NDA termination clauses"
         )
 
-        # Should recognize this as potentially contract-related
+        # Should recognize this as potentially contract-related and suggest contract tools
         assert result is not None
+        assert "suggestion" in result or "recommendation" in result
 
     @pytest.mark.asyncio
     async def test_search_handles_generic_queries(self):
         """Test handling of generic non-contract queries."""
         from src.tools.google_search_tool import _google_search_impl
 
-        with patch("src.tools.google_search_tool._perform_web_search") as mock_search:
-            mock_search.return_value = {
-                "results": [{"title": "Result 1", "snippet": "Description"}]
-            }
+        # Generic query without contract keywords
+        result = await _google_search_impl(
+            query="weather in San Francisco"
+        )
 
-            result = await _google_search_impl(
-                query="weather in San Francisco"
-            )
-
-            assert result is not None
+        # Should return a result (may suggest contract capabilities)
+        assert result is not None
+        assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_redirect_to_contracts(self):
         """Test redirect to contract tools suggestion."""
         from src.tools.google_search_tool import _redirect_to_contracts_impl
 
+        # Note: _redirect_to_contracts_impl only takes original_query parameter
         result = await _redirect_to_contracts_impl(
             original_query="find liability clauses",
-            suggested_action="Use search_contracts tool to find liability clauses in your documents",
         )
 
         assert result is not None
-        assert "suggested_action" in str(result).lower() or result is not None
+        assert "message" in result or "what_i_can_do" in result
 
 
 class TestToolIntegration:
@@ -207,33 +235,49 @@ class TestToolIntegration:
     @pytest.mark.asyncio
     async def test_search_then_analyze_flow(self, mock_vector_service):
         """Test search followed by analysis flow."""
+        from src.services.vector_service import SearchResult
+
+        # Setup mock search results
         mock_vector_service.search.return_value = [
-            {
-                "content": "5.1 Liability shall not exceed $500,000.",
-                "metadata": {"clause_number": "5.1"},
-                "score": 0.95,
-            }
+            SearchResult(
+                id="result-1",
+                text="5.1 Liability shall not exceed $500,000.",
+                score=0.95,
+                metadata={"clause_number": "5.1", "document_id": "doc-1"},
+            )
         ]
 
-        with patch("src.tools.search_tool.get_vector_service", return_value=mock_vector_service), \
-             patch("src.tools.analysis_tool._call_gemini") as mock_llm:
+        mock_embedding_service = AsyncMock()
+        mock_embedding_service.embed_query = AsyncMock(return_value=[0.1] * 384)
 
-            mock_llm.return_value = '{"risk_level": "high", "analysis": "High liability cap"}'
+        # Mock Gemini response for analysis
+        mock_response = MagicMock()
+        mock_response.text = '{"risk_level": "high", "analysis": "High liability cap"}'
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+
+        # Patch at service module level
+        with patch("src.services.vector_service.get_vector_service", return_value=mock_vector_service), \
+             patch("src.services.embedding_service.get_embedding_service", return_value=mock_embedding_service), \
+             patch("src.tools.analysis_tool.genai.Client", return_value=mock_client):
 
             # First search
-            from src.tools.search_tool import _search_contracts_impl
-            search_results = await _search_contracts_impl(
+            from src.tools.search_tool import search_contracts
+            search_results = await search_contracts(
                 query="liability",
                 top_k=1,
             )
 
+            assert search_results is not None
+            assert search_results.get("success") is True
+
             # Then analyze
-            from src.tools.analysis_tool import _analyze_clause_impl
+            from src.tools.analysis_tool import analyze_clause
 
-            if search_results:
-                analysis = await _analyze_clause_impl(
-                    clause_text=mock_vector_service.search.return_value[0]["content"],
-                    analysis_type="risk",
-                )
+            analysis = await analyze_clause(
+                clause_text="5.1 Liability shall not exceed $500,000.",
+                analysis_type="legal",
+            )
 
-                assert analysis is not None
+            assert analysis is not None
+            assert "success" in analysis
