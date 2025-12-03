@@ -376,11 +376,11 @@ flowchart TB
     end
 
     subgraph UVICORN["uvicorn (make dev)"]
-        FASTAPI[FastAPI Server :8000<br/>hot-reload enabled]
-        WEB[/ - Web UI]
-        DOCS[/docs - API Docs]
-        HEALTH[/health - Health Check]
-        METRICS[/metrics - Metrics]
+        FASTAPI["FastAPI Server :8000<br/>hot-reload enabled"]
+        WEB["/ - Web UI"]
+        DOCS["/docs - API Docs"]
+        HEALTH["/health - Health Check"]
+        METRICS["/metrics - Metrics"]
     end
 
     DOCKER --> UVICORN
